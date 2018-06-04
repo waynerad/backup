@@ -35,7 +35,6 @@ func isSkippableErrorMessage(message string) bool {
 }
 
 func getDirectoryTree(path string, result []wfileInfo, skipIfPermissionDenied bool) []wfileInfo {
-	// fmt.Println(path)
 	// separator := "\\" // WINDOWS-specific
 	separator := "/"
 	dir, err := os.Open(path)
@@ -121,6 +120,19 @@ func lastslash(str string) int {
 	return rv
 }
 
+// This function scans two directories, sourcePath and destPath, then sorts the
+// results (using the full paths to files in subdirectories within these
+// starting source and destination directories), then walks through the source
+// and destination lists in alphabetical order where it's easy to see if a file
+// is present in one list but missing in the other. If a file is present in the
+// source but missing in the destination, it gets copied. If it's present in
+// the destination but missing in the source, the destination file gets
+// deleted. If it's present in both, the file size and time are compared to see
+// if they are the same. If they are different, the file is copies from source
+// to destination and the old destination file is overwritten.
+//
+// The system optionally uses concurrency to scan the source and destination
+// trees at the same time. It's a good concurrency demo in Golang
 func backup(sourcePath string, destPath string, concurrent bool, doDeletes bool, skipIfPermissionDenied bool) {
 	var sourceTree []wfileInfo
 	var destTree []wfileInfo
@@ -154,9 +166,6 @@ func backup(sourcePath string, destPath string, concurrent bool, doDeletes bool,
 		sourceTree = getDirectoryTree(sourcePath, sourceTree, skipIfPermissionDenied)
 		sortSlice.theSlice = sourceTree
 		sort.Sort(&sortSlice)
-		// qx
-		// fmt.Println(sourceTree)
-		// os.Exit(1)
 
 		fmt.Println("Scanning destination tree.")
 		destTree = make([]wfileInfo, 0)
@@ -199,14 +208,10 @@ func backup(sourcePath string, destPath string, concurrent bool, doDeletes bool,
 				if sourceCompare == destCompare {
 					// both files exist -- same time & date?
 					if sourceTree[sourceIdx].fileSize != destTree[destIdx].fileSize {
-						// fmt.Println("File sizes not equal")
-						// fmt.Println("One is " + strconv.FormatInt(sourceTree[sourceIdx].fileSize, 10))
-						// fmt.Println("The other is is " + strconv.FormatInt(destTree[destIdx].fileSize, 10))
 						toCopy = sourceIdx
 					} else {
 						if destTree[destIdx].fileTime.Add(timeDuration).Before(sourceTree[sourceIdx].fileTime) {
 							toCopy = sourceIdx
-							// fmt.Println("Based on time.")
 						}
 					}
 					sourceIdx++
